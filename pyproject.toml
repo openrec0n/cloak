@@ -2,7 +2,7 @@
 name = "cloak"
 version = "0.1.0"
 description = "Cloud Security AI Agent for enterprise security teams"
-authors = ["CLOAK Contributors"]
+authors = ["Arpan Sarkar"]
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/openrec0n/cloak"
