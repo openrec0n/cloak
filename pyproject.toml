@@ -1,0 +1,108 @@
+[tool.poetry]
+name = "cloak"
+version = "0.1.0"
+description = "Cloud Security AI Agent for enterprise security teams"
+authors = ["CLOAK Contributors"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/openrec0n/cloak"
+keywords = ["security", "aws", "cloud", "enumeration", "ai-agent", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.35"
+sqlalchemy = "^2.0"
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+structlog = "^24.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-cov = "^6.0"
+moto = {extras = ["all"], version = "^5.0"}
+black = "^24.0"
+ruff = "^0.8"
+mypy = "^1.13"
+boto3-stubs = {extras = ["s3", "iam", "ec2", "lambda", "sts"], version = "^1.35"}
+
+[tool.poetry.scripts]
+cloak = "cloak.cli.runner:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by black)
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use pytest fixtures which have required signatures
+"tests/**/*.py" = ["ARG001", "ARG002"]
+# Structlog processor callbacks require specific signatures
+"cloak/core/logging.py" = ["ARG001"]
+# SQLAlchemy event handlers require specific signatures
+"cloak/core/database.py" = ["ARG001"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["cloak"]
+branch = true
+omit = [
+    "cloak/cli/__main__.py",  # Entry point, difficult to test
+    "cloak/core/metrics.py",  # Utility module, low coverage priority
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+exclude_also = [
+    "if __name__ == .__main__.:",
+]

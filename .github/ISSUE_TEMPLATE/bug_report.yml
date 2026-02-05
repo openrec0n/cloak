@@ -1,0 +1,53 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out the sections below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect? (include expected vs actual behavior)
+      placeholder: When I run s3.list_buckets it crashes. Expected a summary; got exit code 2.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run command '...'
+        2. See error '...'
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: CLOAK version, Python version, OS (e.g. v0.1.0, 3.11.5, macOS)
+      placeholder: v0.1.0, 3.11.5, macOS
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context (logs, AWS service, etc.)
+      placeholder: Relevant logs from data/logs/ or other details...
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
