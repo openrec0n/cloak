@@ -16,7 +16,9 @@
 
 ## What is CLOAK?
 
-CLOAK is an **[agent harness](https://michaellivs.com/blog/agent-harness/)** for cloud security - the infrastructure layer that transforms Claude Code into an effective security analyst.
+CLOAK lets you run cloud security testing through Claude Code -- controlled, auditable, and privacy-first. No sensitive data ever enters AI context.
+
+It's an **[agent harness](https://michaellivs.com/blog/agent-harness/)** -- the infrastructure layer that makes Claude Code an effective and safe security testing agent.
 
 Agent frameworks handle the basic loop: call model, parse tools, execute, repeat. But they leave critical behaviors undefined: What context gets injected? How do tool outputs render for different consumers? When does the agent stop? What enforces safety?
 
