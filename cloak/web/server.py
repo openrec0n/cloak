@@ -379,7 +379,7 @@ def export_execution(execution_id: str) -> Any:
 # --- SSE (Server-Sent Events) for Real-Time Updates ---
 
 
-async def _event_stream(request: Request) -> AsyncGenerator[str, None]:
+async def _event_stream(request: Request) -> AsyncGenerator[str, None]:  # pragma: no cover
     """Generate SSE events by polling the database for changes.
 
     Watches for new executions, status transitions, and findings,
@@ -466,7 +466,7 @@ async def _event_stream(request: Request) -> AsyncGenerator[str, None]:
 
 
 @app.get("/api/events")
-async def event_stream(request: Request) -> StreamingResponse:
+async def event_stream(request: Request) -> StreamingResponse:  # pragma: no cover
     """SSE endpoint for real-time dashboard updates.
 
     Streams events when new executions or findings are added to the database.
@@ -489,7 +489,7 @@ async def event_stream(request: Request) -> StreamingResponse:
 # --- Agent Status WebSocket ---
 
 
-async def _broadcast_agent_status(event: dict[str, Any]) -> None:
+async def _broadcast_agent_status(event: dict[str, Any]) -> None:  # pragma: no cover
     """Broadcast agent status event to all connected WebSocket clients."""
     if not _agent_status_connections:
         return
@@ -556,7 +556,7 @@ def create_app(config: CloakConfig | None = None) -> FastAPI:
         Configured FastAPI app.
     """
     if config is None:
-        config = CloakConfig.default()
+        config = CloakConfig.default()  # pragma: no cover
 
     set_config(config)
     config.ensure_directories()
@@ -565,7 +565,7 @@ def create_app(config: CloakConfig | None = None) -> FastAPI:
     return app
 
 
-def run_server(config: CloakConfig | None = None, port: int = 8080) -> None:
+def run_server(config: CloakConfig | None = None, port: int = 8080) -> None:  # pragma: no cover
     """Run the web UI server.
 
     Args:

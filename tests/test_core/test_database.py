@@ -8,6 +8,9 @@ from cloak.core.database import (
     create_in_memory_engine,
     create_test_session,
     get_database_url,
+    get_execution_stats,
+    get_executions_by_technique,
+    get_recent_executions,
 )
 from cloak.core.models import Asset, Execution, ExecutionStatus, Finding
 
@@ -280,3 +283,66 @@ class TestModelOperations:
         assert len(execution.findings) == 1
         assert execution.assets[0].id == asset.id
         assert execution.findings[0].id == finding.id
+
+
+class TestQueryHelpers:
+    """Tests for database query helper functions."""
+
+    def test_get_recent_executions(self, db_session):
+        """Test fetching recent executions."""
+        for i in range(3):
+            exec_ = Execution(
+                technique_name=f"s3.technique_{i}",
+                service="s3",
+                aws_account_id="123456789012",
+                aws_identity_arn="arn:aws:iam::123456789012:user/test",
+            )
+            exec_.mark_completed(summary=f"Summary {i}", finding_count=0, asset_count=0)
+            db_session.add(exec_)
+        db_session.commit()
+
+        results = get_recent_executions(db_session, limit=2)
+        assert len(results) == 2
+
+    def test_get_executions_by_technique(self, db_session):
+        """Test fetching executions by technique name."""
+        exec_ = Execution(
+            technique_name="s3.list_buckets",
+            service="s3",
+            aws_account_id="123456789012",
+            aws_identity_arn="arn:aws:iam::123456789012:user/test",
+        )
+        db_session.add(exec_)
+        db_session.commit()
+
+        results = get_executions_by_technique(db_session, "s3.list_buckets")
+        assert len(results) == 1
+        assert results[0].technique_name == "s3.list_buckets"
+
+        results = get_executions_by_technique(db_session, "nonexistent")
+        assert len(results) == 0
+
+    def test_get_execution_stats(self, db_session):
+        """Test execution statistics."""
+        exec1 = Execution(
+            technique_name="s3.list_buckets",
+            service="s3",
+            aws_account_id="123456789012",
+            aws_identity_arn="arn:aws:iam::123456789012:user/test",
+        )
+        exec1.mark_completed(summary="OK", finding_count=0, asset_count=0)
+        exec2 = Execution(
+            technique_name="s3.get_bucket_acl",
+            service="s3",
+            aws_account_id="123456789012",
+            aws_identity_arn="arn:aws:iam::123456789012:user/test",
+        )
+        exec2.mark_failed(error_message="Access denied")
+        db_session.add_all([exec1, exec2])
+        db_session.commit()
+
+        stats = get_execution_stats(db_session)
+        assert stats["total_executions"] == 2
+        assert stats["completed"] == 1
+        assert stats["failed"] == 1
+        assert stats["success_rate"] == 0.5

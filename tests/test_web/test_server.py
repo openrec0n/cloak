@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -180,6 +182,36 @@ class TestApiFindings:
         assert data["severity"] == "high"
         assert "execution" in data
 
+    def test_get_finding_detail_includes_asset(self, client):
+        """Test finding detail includes asset context when asset_id is set."""
+        finding_id = client.get("/api/findings").json()["findings"][0]["id"]
+        response = client.get(f"/api/findings/{finding_id}")
+        data = response.json()
+        assert "asset" in data
+        assert data["asset"]["resource_type"] == "s3_bucket"
+
+    def test_get_finding_detail_without_asset(self, client, test_config):
+        """Test finding detail when finding has no asset_id."""
+        exec_id = client.get("/api/executions").json()["executions"][0]["id"]
+        with session_scope(test_config) as session:
+            f = Finding(
+                execution_id=exec_id,
+                severity="medium",
+                finding_type="misconfiguration",
+                title="No asset finding",
+                description="Test",
+                resource_type="s3_bucket",
+                resource_id="bucket-x",
+            )
+            session.add(f)
+            session.commit()
+            finding_id = f.id
+
+        response = client.get(f"/api/findings/{finding_id}")
+        data = response.json()
+        assert "execution" in data
+        assert "asset" not in data
+
     def test_get_finding_detail_not_found(self, client):
         """Test 404 for non-existent finding."""
         response = client.get("/api/findings/00000000-0000-0000-0000-000000000000")
@@ -254,6 +286,33 @@ class TestApiExport:
         response = client.get("/api/export/findings")
         data = response.json()
         assert data["total_findings"] == 2
+
+    def test_export_findings_includes_context(self, client):
+        """Test exported findings include execution and asset context."""
+        response = client.get("/api/export/findings")
+        data = response.json()
+        finding = data["findings"][0]
+        assert "execution" in finding
+        assert finding["execution"]["service"] == "s3"
+        assert "asset" in finding
+        assert finding["asset"]["resource_type"] == "s3_bucket"
+        assert "by_severity" in data["summary"]
+        assert data["summary"]["by_severity"]["high"] == 1
+
+    def test_export_findings_with_severity_filter(self, client):
+        """Test exporting findings filtered by severity."""
+        response = client.get("/api/export/findings?severity=high")
+        data = response.json()
+        assert data["total_findings"] == 1
+        assert data["findings"][0]["severity"] == "high"
+
+    def test_export_findings_with_execution_id_filter(self, client):
+        """Test exporting findings filtered by execution_id."""
+        exec_id = client.get("/api/executions").json()["executions"][0]["id"]
+        response = client.get(f"/api/export/findings?execution_id={exec_id}")
+        data = response.json()
+        assert data["total_findings"] == 1
+        assert data["filters"]["execution_id"] == exec_id
 
     def test_export_execution_not_found(self, client):
         """Test 404 when exporting non-existent execution."""
@@ -532,6 +591,38 @@ class TestFilterCombinations:
         data = response.json()
         assert len(data["assets"]) == 0
 
+    def test_executions_filter_by_technique(self, client):
+        """Test filtering executions by technique name."""
+        response = client.get("/api/executions?technique=s3.list_buckets")
+        data = response.json()
+        assert len(data["executions"]) == 1
+
+        response = client.get("/api/executions?technique=nonexistent")
+        data = response.json()
+        assert len(data["executions"]) == 0
+
+    def test_assets_filter_by_resource_type(self, client):
+        """Test filtering assets by resource_type."""
+        response = client.get("/api/assets?resource_type=s3_bucket")
+        data = response.json()
+        assert len(data["assets"]) == 2
+
+        response = client.get("/api/assets?resource_type=ec2_instance")
+        data = response.json()
+        assert len(data["assets"]) == 0
+
+    def test_assets_filter_by_execution_id(self, client):
+        """Test filtering assets by execution_id."""
+        exec_id = client.get("/api/executions").json()["executions"][0]["id"]
+
+        response = client.get(f"/api/assets?execution_id={exec_id}")
+        data = response.json()
+        assert len(data["assets"]) == 2
+
+        response = client.get("/api/assets?execution_id=00000000-0000-0000-0000-000000000000")
+        data = response.json()
+        assert len(data["assets"]) == 0
+
 
 class TestStatsStatusConsistency:
     """Tests for status case consistency fix."""
@@ -580,3 +671,27 @@ class TestStatsStatusConsistency:
         # Upper case - should still work (lowered by server)
         response = client.get("/api/executions?status=COMPLETED")
         assert len(response.json()["executions"]) == 1
+
+
+class TestErrorHandling:
+    """Tests for global exception handler."""
+
+    def test_global_exception_handler(self, test_config):
+        """Test unhandled exceptions return 500 JSON response."""
+        close_database()
+        app = create_app(test_config)
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch("cloak.web.server.session_scope", side_effect=RuntimeError("boom")):
+            response = client.get("/api/stats")
+            assert response.status_code == 500
+            assert response.json()["error"] == "Internal server error"
+        close_database()
+
+
+class TestWebSocket:
+    """Tests for WebSocket endpoints."""
+
+    def test_agent_status_websocket_connect_disconnect(self, client):
+        """Test WebSocket connect and disconnect lifecycle."""
+        with client.websocket_connect("/api/agent-status"):
+            pass
