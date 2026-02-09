@@ -1,8 +1,11 @@
 """CLI runner for executing CLOAK techniques."""
 
 import argparse
+import contextlib
 import json
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 
 from cloak.core.aws_connection import validate_aws_connection
@@ -100,6 +103,8 @@ def run_technique(
     config_json: str | None,
     dry_run: bool,
     output_format: str,
+    open_ui: bool = False,
+    port: int = 8080,
 ) -> int:
     """Run a technique.
 
@@ -108,6 +113,8 @@ def run_technique(
         config_json: Optional JSON config string
         dry_run: If True, show planned actions without executing
         output_format: Output format (json or text)
+        open_ui: If True, open Web UI to execution detail after execution
+        port: Web UI port for deep links
 
     Returns:
         Exit code (0 success, 1 validation error, 2 execution error)
@@ -136,6 +143,16 @@ def run_technique(
         cloak_config = CloakConfig.default()
         cloak_config.ensure_directories()
 
+        # Emit agent status to Web UI
+        _emit_agent_event(
+            port,
+            {
+                "type": "technique_start",
+                "technique": technique_name,
+                "dry_run": dry_run,
+            },
+        )
+
         # Execute technique
         if dry_run:
             # Dry-run mode - no database needed
@@ -145,6 +162,10 @@ def run_technique(
                 format_dry_run_output(
                     result, technique_name=technique_name, config=parameters or None
                 )
+            )
+            _emit_agent_event(
+                port,
+                {"type": "technique_complete", "technique": technique_name, "dry_run": True},
             )
             return 0
         else:
@@ -164,19 +185,49 @@ def run_technique(
 
                 # Format output
                 if output_format == "json":
-                    print(format_json_output(result))
+                    print(format_json_output(result, web_ui_port=port))
                 else:
-                    print(format_text_output(result))
+                    print(format_text_output(result, web_ui_port=port))
+
+                # Emit completion to Web UI
+                _emit_agent_event(
+                    port,
+                    {
+                        "type": "technique_complete",
+                        "technique": technique_name,
+                        "dry_run": False,
+                        "execution_id": result.execution_id,
+                        "success": result.success,
+                        "asset_count": result.asset_count,
+                        "finding_count": result.finding_count,
+                    },
+                )
+
+                # Open Web UI to execution detail if requested
+                if open_ui and result.success:
+                    open_web_ui_to_execution(result.execution_id, port)
 
                 return 0 if result.success else 2
 
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
+        _emit_agent_event(
+            port,
+            {"type": "technique_failed", "technique": technique_name, "error": str(e)},
+        )
         return 1
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         import traceback
 
+        _emit_agent_event(
+            port,
+            {
+                "type": "technique_failed",
+                "technique": technique_name,
+                "error": str(e),
+            },
+        )
         traceback.print_exc()
         return 2
 
@@ -385,7 +436,7 @@ def list_executions(limit: int = 10, output_format: str = "text") -> int:
 
                 print(f"Recent Executions (last {len(executions)}):\n")
                 for exec in executions:
-                    status_icon = "✓" if exec.status == "COMPLETED" else "✗"
+                    status_icon = "✓" if exec.status == "completed" else "✗"
                     print(f"{status_icon} ID {exec.id}: {exec.technique_name}")
                     print(f"   Started: {exec.started_at}")
                     print(f"   Account: {exec.aws_account_id}")
@@ -524,6 +575,263 @@ def _convert_param_value(value: str, param_type: str) -> Any:
         raise ValueError(f"Unsupported parameter type: {param_type}")
 
 
+def _emit_agent_event(port: int, event: dict[str, Any]) -> None:
+    """Emit agent event to Web UI (fire-and-forget).
+
+    Posts the event directly without a health check first.
+    If the server isn't running, the POST will fail silently.
+    """
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/agent-events",
+            data=json.dumps(event).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2) as _:
+            pass
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+        pass  # Ignore - Web UI may not be running
+
+
+def is_web_ui_running(port: int = 8080) -> bool:
+    """Check if the CLOAK web UI server is running on the given port.
+
+    Verifies the health endpoint to confirm it's actually a CLOAK server,
+    not some other service occupying the port.
+
+    Args:
+        port: Port to check (default: 8080).
+
+    Returns:
+        True if CLOAK Web UI is responding on the port.
+    """
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/health",
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return bool(data.get("service") == "cloak-web-ui")
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError):
+        return False
+
+
+def launch_web_ui(port: int = 8080, background: bool = False) -> int:
+    """Launch the CLOAK web UI server.
+
+    Args:
+        port: Port to listen on (default: 8080).
+        background: If True, run server as a background daemon process.
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        if is_web_ui_running(port):
+            print(f"Web UI already running at http://localhost:{port}")
+            return 0
+
+        if background:
+            return _launch_web_ui_background(port)
+        else:
+            return _launch_web_ui_foreground(port)
+    except Exception as e:
+        print(f"Error starting web UI: {e}", file=sys.stderr)
+        return 1
+
+
+def _launch_web_ui_foreground(port: int) -> int:
+    """Launch web UI in foreground (blocking) mode.
+
+    Args:
+        port: Port to listen on.
+
+    Returns:
+        Exit code.
+    """
+    try:
+        import webbrowser
+
+        from cloak.web.server import run_server
+
+        cloak_config = CloakConfig.default()
+        cloak_config.ensure_directories()
+
+        # Open browser after a short delay
+        import threading
+
+        def open_browser() -> None:
+            import time
+
+            time.sleep(1.0)
+            webbrowser.open(f"http://localhost:{port}")
+
+        threading.Thread(target=open_browser, daemon=True).start()
+
+        run_server(config=cloak_config, port=port)
+        return 0
+    except KeyboardInterrupt:
+        print("\nWeb UI server stopped.")
+        return 0
+
+
+def _launch_web_ui_background(port: int) -> int:
+    """Launch web UI as a background daemon process.
+
+    Args:
+        port: Port to listen on.
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    import os
+    import subprocess
+    import time
+
+    # Build the command to run the web server
+    cmd = [
+        sys.executable,
+        "-m",
+        "cloak.web.server",
+        "--port",
+        str(port),
+    ]
+
+    # Launch as a detached subprocess
+    pid_file = os.path.join("data", ".web_ui.pid")
+    os.makedirs("data", exist_ok=True)
+
+    # Start the subprocess, detached from the parent
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    # Write PID file with port so we can find it later
+    with open(pid_file, "w") as f:
+        json.dump({"pid": process.pid, "port": port}, f)
+
+    # Wait briefly and verify it started
+    time.sleep(1.0)
+    if is_web_ui_running(port):
+        print(f"  CLOAK Web UI running in background at http://localhost:{port}")
+        print(f"  PID: {process.pid}")
+        return 0
+    else:
+        print("Error: Web UI failed to start in background", file=sys.stderr)
+        return 1
+
+
+def get_background_web_ui_port() -> int | None:
+    """Read the port of a background Web UI process from the PID file.
+
+    Returns:
+        The port number if a PID file exists and is valid, None otherwise.
+    """
+    import os
+
+    pid_file = os.path.join("data", ".web_ui.pid")
+    if not os.path.exists(pid_file):
+        return None
+    try:
+        with open(pid_file) as f:
+            content = f.read().strip()
+        # Support both JSON format (new) and plain PID format (legacy)
+        try:
+            data = json.loads(content)
+            return int(data.get("port", 8080))
+        except json.JSONDecodeError:
+            # Legacy format: just a PID number, assume default port
+            return 8080
+    except OSError:
+        return None
+
+
+def stop_web_ui() -> int:
+    """Stop a background CLOAK Web UI process.
+
+    Reads the PID file, sends SIGTERM, and cleans up the PID file.
+    Supports both JSON format (new: {"pid": ..., "port": ...}) and
+    plain PID format (legacy: just a number).
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    import os
+    import signal
+
+    pid_file = os.path.join("data", ".web_ui.pid")
+
+    if not os.path.exists(pid_file):
+        print("No background Web UI process found (no PID file).")
+        return 0
+
+    try:
+        with open(pid_file) as f:
+            content = f.read().strip()
+        # Support both JSON format (new) and plain PID format (legacy)
+        try:
+            data = json.loads(content)
+            pid = data["pid"]
+        except (json.JSONDecodeError, KeyError):
+            pid = int(content)
+    except (ValueError, OSError) as e:
+        print(f"Error reading PID file: {e}", file=sys.stderr)
+        os.remove(pid_file)
+        return 1
+
+    # Check if process is still running
+    try:
+        os.kill(pid, 0)  # Signal 0 = check if process exists
+    except OSError:
+        print(f"  Web UI process (PID {pid}) is not running. Cleaning up stale PID file.")
+        os.remove(pid_file)
+        return 0
+
+    # Send SIGTERM for graceful shutdown
+    try:
+        os.kill(pid, signal.SIGTERM)
+        print(f"  Stopped Web UI background process (PID {pid}).")
+    except OSError as e:
+        print(f"Error stopping process {pid}: {e}", file=sys.stderr)
+        return 1
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(pid_file)
+
+    return 0
+
+
+def open_web_ui_to_execution(execution_id: str, port: int = 8080) -> None:
+    """Open the web UI browser to a specific execution detail page.
+
+    If the Web UI server is not running, prints the URL for the user
+    to visit later (does not open the browser to avoid a confusing
+    connection-refused page).
+
+    Args:
+        execution_id: The execution ID to navigate to.
+        port: Port the web UI is running on.
+    """
+    import webbrowser
+
+    url = f"http://localhost:{port}/#/executions/{execution_id}"
+
+    if not is_web_ui_running(port):
+        print(
+            f"\n  Note: Web UI is not running on port {port}."
+            f"\n  Start it with: cloak --web-ui --port {port}"
+            f"\n  Then visit: {url}\n"
+        )
+        return
+
+    webbrowser.open(url)
+
+
 def main() -> int:
     """Main CLI entry point."""
     setup_logging(get_config())
@@ -549,6 +857,14 @@ Examples:
   # Execution history
   cloak --list-executions --limit 20
   cloak --execution-info 42
+
+  # Web UI
+  cloak --web-ui
+  cloak --web-ui --port 9090
+  cloak --web-ui --background
+
+  # Execute and open Web UI to results
+  cloak --technique s3.list_buckets --execute --open-ui
 
   # Registry management
   cloak --generate-registry
@@ -630,6 +946,38 @@ Examples:
         help="Show detailed execution information (UUID)",
     )
 
+    # Web UI
+    parser.add_argument(
+        "--web-ui",
+        action="store_true",
+        help="Launch the CLOAK web UI in a browser",
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for web UI server (default: 8080)",
+    )
+
+    parser.add_argument(
+        "--background",
+        action="store_true",
+        help="Run web UI server as a background daemon process",
+    )
+
+    parser.add_argument(
+        "--open-ui",
+        action="store_true",
+        help="After technique execution, open the Web UI to the execution detail page",
+    )
+
+    parser.add_argument(
+        "--stop-web-ui",
+        action="store_true",
+        help="Stop a background Web UI process",
+    )
+
     # Registry management
     parser.add_argument(
         "--generate-registry", action="store_true", help="Generate technique registry file"
@@ -647,6 +995,13 @@ Examples:
 
     if args.technique_info:
         return technique_info(args.technique_info, args.output)
+
+    # Handle web UI
+    if args.stop_web_ui:
+        return stop_web_ui()
+
+    if args.web_ui:
+        return launch_web_ui(args.port, background=args.background)
 
     # Handle execution history commands
     if args.list_executions:
@@ -691,6 +1046,8 @@ Examples:
         config_json=config_json,
         dry_run=dry_run,
         output_format=args.output,
+        open_ui=args.open_ui,
+        port=args.port,
     )
 
 

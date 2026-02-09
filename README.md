@@ -18,44 +18,39 @@
 
 CLOAK lets you run cloud security testing through Claude Code -- controlled, auditable, and privacy-first. No sensitive data ever enters AI context.
 
-It's an **[agent harness](https://michaellivs.com/blog/agent-harness/)** -- the infrastructure layer that makes Claude Code an effective and safe security testing agent.
+It's an **[agent harness](https://michaellivs.com/blog/agent-harness/)** -- that transforms Claude Code an effective and safe security testing agent.
 
-Agent frameworks handle the basic loop: call model, parse tools, execute, repeat. But they leave critical behaviors undefined: What context gets injected? How do tool outputs render for different consumers? When does the agent stop? What enforces safety?
+## What You Can Do
 
-CLOAK defines all of these for security testing:
+| You want to... | Ask Claude... |
+|----------------|---------------|
+| Find public or misconfigured S3 buckets | "Enumerate S3 buckets and check for public access" |
+| Inventory Lambda functions and policies | "List Lambda functions and their resource policies" |
+| Assume a role for cross-account testing | "Assume the SecurityAudit role" |
+| See what CLOAK can run before executing | "What techniques are available?" |
+| Review full results (names, ARNs) in the browser | "Open the Web UI" or "Show me that run in the dashboard" |
 
-| Harness Behavior | What CLOAK Does |
-|-----------------|-----------------|
-| **Tool Output Protocol** | Claude sees sanitized summaries. Full data (bucket names, ARNs, account IDs) stays in local SQLite. Your sensitive data never enters AI context. |
-| **Tool Enforcement** | Dry-run previews every action. `--execute` flag required. Human confirmation before any AWS API call. |
-| **Context Injection** | Skills load technique documentation when relevant. Registry provides discovery without bloating context. |
-| **Queryable State** | Execution history persisted in SQLite. Retrieve details anytime via `--execution-info <id>`. |
-| **Hooks** | Claude Code hooks enforce dry-run, DB access approval, session context, and output validation; see [Hooks](docs/hooks/). |
-
-The result: agentic security testing that works - leveraging one of the world's most capable AI agents.
+Claude Code identifies the right technique, shows you what it will do, and executes after you confirm. Results return as sanitized summaries; sensitive data never enters the AI context.
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/openrec0n/cloak.git
-cd cloak && claude
+cd cloak && poetry install
 ```
 
-Then open the project in **Claude Code** and start talking. Claude will handle setup automatically when needed, or you can ask it to run `/setup-cloak`.
+Open the project in **Claude Code**, then ask: *"What techniques are available?"*
 
 > **Note:** Configure AWS credentials as usual (`~/.aws/credentials`, environment variables, or SSO). CLOAK will pick them up automatically.
 
-**Then just ask:**
+## Why CLOAK
 
-```
-"What techniques are available?"
-
-"Enumerate S3 buckets and check for public access"
-
-"Show me IAM roles with overly permissive trust policies"
-```
-
-Claude identifies the right technique, shows you what it will do, and executes after you confirm.
+| Benefit | What it means for you |
+|---------|------------------------|
+| **Privacy-first** | Bucket names, ARNs, account IDs stay in local SQLite. Claude never sees them. |
+| **Agent-native** | Leverage Claude Code and other world-class AI agents. No new tools to learn—use the agents you already trust. |
+| **Safe by default** | Dry-run previews every action. No AWS API calls without your confirmation. |
+| **Auditable** | Web UI and `--execution-info` for full details anytime. |
 
 ## How the Harness Works
 
@@ -80,6 +75,17 @@ flowchart LR
 
 When used with Claude Code, these behaviors are enforced by hooks registered in `.claude/settings.json`: session context and AWS validation at startup, dry-run and database-access approval before tool use, and output validation after. See [Hooks](docs/hooks/) for documentation on each hook.
 
+
+| Harness Behavior | What CLOAK Does |
+|-----------------|-----------------|
+| **Tool Output Protocol** | Claude sees sanitized summaries. Full data (bucket names, ARNs, account IDs) stays in local SQLite. Your sensitive data never enters AI context. |
+| **Tool Enforcement** | Dry-run previews every action. `--execute` flag required. Human confirmation before any AWS API call. |
+| **Context Injection** | Skills load technique documentation when relevant. Registry provides discovery without bloating context. |
+| **Queryable State** | Execution history persisted in SQLite. Retrieve details anytime via `--execution-info <id>`. |
+| **Hooks** | Claude Code hooks enforce dry-run, DB access approval, session context, and output validation; see [Hooks](docs/hooks/). |
+
+The result: agentic security testing that works - leveraging one of the world's most capable AI agents.
+
 ## Capabilities
 
 | Service | Techniques |
@@ -100,6 +106,7 @@ Ask Claude Code `"What techniques are available?"` for the full list.
 | [Architecture](docs/ARCHITECTURE.md) | Design principles and system overview |
 | [Development](docs/DEVELOPMENT.md) | Adding new techniques |
 | [Hooks](docs/hooks/) | Claude Code hooks (dry-run, DB approval, session context) |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 | [Contributing](.github/CONTRIBUTING.md) | How to contribute |
 
 ## Explore with Claude
@@ -119,7 +126,7 @@ Claude has full context on the codebase and can guide you through anything.
 
 <br>
 
-CLOAK is a research project exploring **agent harness engineering** - the infrastructure layer that makes AI agents effective in production. We're investigating patterns for context management, tool output protocols, safety enforcement, and privacy boundaries.
+CLOAK is a research project exploring **agent harness engineering** - the infrastructure layer that makes AI agents effective in production. It explores patterns for context management, tool output protocols, safety enforcement, and privacy boundaries.
 
 The security domain is an ideal testbed: it requires handling sensitive data responsibly, enforcing strict operational controls, and maintaining queryable state across sessions. The patterns we're developing here apply broadly to any domain where agents need to be both capable and constrained.
 

@@ -5,11 +5,12 @@ import json
 from cloak.techniques.base import DryRunResult, ExecutionResult
 
 
-def format_json_output(result: ExecutionResult) -> str:
+def format_json_output(result: ExecutionResult, web_ui_port: int = 8080) -> str:
     """Format ExecutionResult as JSON.
 
     Args:
         result: Execution result to format
+        web_ui_port: Port the Web UI runs on, for generating deep links (default: 8080)
 
     Returns:
         JSON string with all execution details
@@ -23,14 +24,15 @@ def format_json_output(result: ExecutionResult) -> str:
           ...
         }
     """
-    return json.dumps(result.to_dict(), indent=2)
+    return json.dumps(result.to_dict(web_ui_port=web_ui_port), indent=2)
 
 
-def format_text_output(result: ExecutionResult) -> str:
+def format_text_output(result: ExecutionResult, web_ui_port: int = 8080) -> str:
     """Format ExecutionResult as human-readable text.
 
     Args:
         result: Execution result to format
+        web_ui_port: Port the Web UI runs on, for generating deep links (default: 8080)
 
     Returns:
         Formatted text output
@@ -54,6 +56,10 @@ def format_text_output(result: ExecutionResult) -> str:
         lines.append("")
         lines.append("Summary:")
         lines.append(result.summary)
+        lines.append("")
+        lines.append(
+            f"View details: http://localhost:{web_ui_port}/#/executions/{result.execution_id}"
+        )
     else:
         lines.append(f"Error: {result.error_message}")
 

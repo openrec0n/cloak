@@ -58,6 +58,39 @@ Verify the principal has the required permissions. Ask Claude code to disply a l
 
 - Check: `sqlite3 data/cloak.db "PRAGMA integrity_check;"`. Restore from backup if you have one.
 
+## Web UI
+
+### Web UI shows no executions
+
+The Web UI and CLI must use the **same database file**. By default, the database path is `data/cloak.db` relative to your current working directory.
+
+- **Run both from the same directory.** If you start the Web UI from `/home/user/cloak` and run techniques from `/tmp`, they will use different databases.
+- **Or set an absolute path** via environment variable or `.env` file:
+  ```bash
+  export CLOAK_DATABASE_PATH=/home/user/cloak/data/cloak.db
+  ```
+  This ensures the CLI and Web UI always use the same database regardless of working directory.
+
+### Port already in use
+
+If port 8080 is already taken by another process:
+
+```bash
+# Use a different port
+cloak --web-ui --port 9090
+
+# Or find what's using 8080
+lsof -i :8080
+```
+
+### Web UI failed to start in background
+
+The background launcher waits 1 second for the server to respond. If it doesn't:
+
+- Check that the port is not in use: `lsof -i :8080`.
+- Try foreground mode first to see errors: `cloak --web-ui`.
+- Check logs in `data/logs/`.
+
 ## CLI
 
 ### Technique not found

@@ -24,8 +24,8 @@ CLOAK implements the [agent harness](https://michaellivs.com/blog/agent-harness/
 
 The harness pattern addresses a fundamental problem: **LLMs are stateless, but effective agents need state**. CLOAK maintains:
 
-- **Execution history** in SQLite, queryable via `--execution-info`
-- **Privacy boundary** enforced by sanitizers-sensitive data never crosses into AI context
+- **Execution history** in SQLite, queryable via `--execution-info` or the Web UI
+- **Privacy boundary** enforced by sanitizers-sensitive data never crosses into AI context. The Web UI serves as the primary "privacy boundary bridge," rendering full details in the browser outside AI context.
 - **Safety guarantees** through mandatory dry-run and confirmation gates
 - **Context efficiency** through progressive disclosure (skills load only when invoked)
 
@@ -35,7 +35,7 @@ This isn't a wrapper around boto3. It's a complete harness that makes Claude an 
 
 ### 1. Agent Never Sees Sensitive Data
 
-Claude receives only sanitized summaries (counts, aggregations). Full results-bucket names, ARNs, resource IDs-are stored in SQLite (`data/cloak.db`) for human review. Use `--execution-info <id>` to fetch details when the user requests them.
+Claude receives only sanitized summaries (counts, aggregations). Full results-bucket names, ARNs, resource IDs-are stored in SQLite (`data/cloak.db`) for human review. The **Web UI** (`cloak --web-ui`) is the primary way for users to browse full details in a visual dashboard, with `--execution-info <id>` available as a CLI fallback.
 
 ### 2. Progressive Disclosure
 
@@ -142,12 +142,15 @@ The following diagram illustrates the complete workflow, highlighting the **priv
     ┌─────────────────────┐          │          ┌─────────────────────────┐
     │  HUMAN RETRIEVAL    │          │          │    CLAUDE RESPONSE      │
     │                     │          │          │                         │
-    │  $ python -m cloak  │          │          │  "I found 15 S3 buckets │
-    │    --execution-info │          │          │   distributed across 3  │
-    │    abc-123-def      │          │          │   regions. Use          │
-    │                     │          │          │   --execution-info to   │
-    │  Shows full data    │          │          │   see bucket names."    │
-    │  on user's terminal │          │          │                         │
+    │  PRIMARY: Web UI    │          │          │  "I found 15 S3 buckets │
+    │  localhost:8080/    │          │          │   distributed across 3  │
+    │  #/executions/      │          │          │   regions. View details │
+    │  abc-123-def        │          │          │   at: localhost:8080/   │
+    │                     │          │          │   #/executions/abc-123" │
+    │  FALLBACK: CLI      │          │          │                         │
+    │  $ cloak            │          │          │                         │
+    │    --execution-info │          │          │                         │
+    │    abc-123-def      │          │          │                         │
     └─────────────────────┘          │          └─────────────────────────┘
                                      │
     ═════════════════════════════════╧═════════════════════════════════════
@@ -183,6 +186,11 @@ flowchart TB
         Runner["CLI Runner<br/>cloak.cli.runner"]
     end
 
+    subgraph webui [Web UI Layer]
+        WebServer["FastAPI Server<br/>cloak.web.server"]
+        SPA["SPA Dashboard<br/>index.html"]
+    end
+
     subgraph core [Core Layer]
         Config[Config]
         AWSConn[AWS Connection]
@@ -215,6 +223,7 @@ flowchart TB
     end
 
     User --> Claude
+    User --> SPA
     Claude --> SkillDocs
     Claude --> Registry
     Claude --> Runner
@@ -241,6 +250,8 @@ flowchart TB
     Runner --> Formatters
     Runner --> Sanitizers
     Sanitizers --> Claude
+    WebServer --> DB
+    SPA --> WebServer
 ```
 
 **Execution Flow:**
@@ -248,12 +259,15 @@ flowchart TB
 2. Claude invokes CLI with technique name and parameters
 3. Dry-run preview shown → User confirms with `--execute`
 4. Technique runs → Full data stored in SQLite
-5. Sanitized summary returned to stdout → Claude displays summary only
+5. Sanitized summary returned to stdout → Claude displays summary with Web UI deep link
+6. User browses full details in Web UI (outside AI context)
 
-| Data       | Location    | Contains                    | Who sees it   |
-|-----------|-------------|-----------------------------|---------------|
-| Summary   | stdout → AI | Counts, aggregations        | AI + user     |
-| Full data | SQLite      | Resource names, ARNs, etc.  | Human only    |
+| Data       | Location       | Contains                    | Who sees it   |
+|-----------|----------------|-----------------------------|---------------|
+| Summary   | stdout → AI    | Counts, aggregations        | AI + user     |
+| Full data | SQLite         | Resource names, ARNs, etc.  | Human only    |
+| Deep link | stdout → AI    | Web UI URL for execution    | AI + user     |
+| Dashboard | Web UI browser | Full details, charts, drill-down | Human only |
 
 ## Components
 
@@ -279,6 +293,17 @@ flowchart TB
 ### CLI (`cloak/cli/`)
 
 - **Runner** (`runner.py`): Main entry point. Handles technique loading via registry, parameter parsing, dry-run/execute dispatch, and output formatting.
+
+### Web UI (`cloak/web/`)
+
+The Web UI is the **privacy boundary bridge**-the human-only interface for viewing full sensitive data that Claude is prevented from seeing.
+
+- **Server** (`server.py`): FastAPI application providing REST API endpoints for querying executions, assets, and findings. Includes SSE endpoint (`/api/events`) for real-time updates. Supports foreground and background (daemon) modes.
+- **Agent Status** (`/api/agent-status`): WebSocket endpoint for real-time agent lifecycle events. When the CLI runs a technique, it POSTs to `/api/agent-events`; the server broadcasts to connected WebSocket clients. The UI shows "Agent running X..." and toasts on completion.
+- **SPA** (`static/index.html`): Single-page application with client-side routing. Dark theme, cybersecurity-focused aesthetic. Views: Dashboard (stats, charts), Executions (list + detail), Findings (list + detail). No build step required.
+- **Deep Links**: The CLI includes `web_ui_url` in execution output so Claude can direct users to specific pages (e.g., `http://localhost:8080/#/executions/<id>`).
+
+**Data flow**: SPA → FastAPI REST API → SQLAlchemy → SQLite (`data/cloak.db`). Techniques are run via the CLI; results are written to the database and browsed in the Web UI.
 
 ### Skills (`.claude/skills/`)
 

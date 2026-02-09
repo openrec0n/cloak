@@ -79,6 +79,7 @@ data/*.db
 data/cloak.db
 data/logs/*.log
 data/logs/*.json
+data/.web_ui.pid
 
 # Keep data directories but ignore contents
 !data/.gitkeep
@@ -104,3 +105,6 @@ docs/PHASE_*.md
 
 # Claude local settings
 .claude/settings.local.json
+
+# Claude local-only skills
+.claude/skills/frontend-design/

@@ -87,8 +87,22 @@ class TestFormatJsonOutput:
             "finding_count",
             "duration_seconds",
             "error_message",
+            "web_ui_url",
         }
         assert set(data.keys()) == expected_keys
+
+    def test_web_ui_port_in_deep_link(self):
+        """Test that custom web_ui_port is used in deep link."""
+        result = ExecutionResult(
+            execution_id="port-test",
+            success=True,
+            summary="Port test",
+        )
+
+        output = format_json_output(result, web_ui_port=9090)
+        data = json.loads(output)
+
+        assert data["web_ui_url"] == "http://localhost:9090/#/executions/port-test"
 
 
 class TestFormatTextOutput:
@@ -167,6 +181,18 @@ class TestFormatTextOutput:
         assert "\n" in output
         # Should have key-value format
         assert ":" in output
+
+    def test_web_ui_port_in_deep_link(self):
+        """Test that custom web_ui_port is used in View details link."""
+        result = ExecutionResult(
+            execution_id="port-test",
+            success=True,
+            summary="Port test",
+        )
+
+        output = format_text_output(result, web_ui_port=9090)
+
+        assert "http://localhost:9090/#/executions/port-test" in output
 
 
 class TestFormatDryRunOutput:

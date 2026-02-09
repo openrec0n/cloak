@@ -123,6 +123,8 @@ python -m cloak.cli --validate-connection
 | `CLOAK_LOG_LEVEL` | Logging level | `INFO` |
 | `CLOAK_DEFAULT_REGIONS` | AWS regions to scan | `us-east-1,us-west-2` |
 
+> **Note:** `CLOAK_DATABASE_PATH` defaults to a relative path (`data/cloak.db`). The CLI and Web UI must use the same database to share results. Either run both from the same directory, or set an absolute path (e.g. `CLOAK_DATABASE_PATH=/home/user/cloak/data/cloak.db`) so both resolve to the same file.
+
 ## Troubleshooting
 
 For AWS authentication errors (Unable to locate credentials, InvalidClientTokenId, ExpiredToken, SignatureDoesNotMatch) and permission issues, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
