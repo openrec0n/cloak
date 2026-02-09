@@ -79,6 +79,7 @@ data/*.db
 data/cloak.db
 data/logs/*.log
 data/logs/*.json
+data/.web_ui.pid
 
 # Keep data directories but ignore contents
 !data/.gitkeep

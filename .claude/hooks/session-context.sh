@@ -120,6 +120,46 @@ get_recent_executions() {
     fi
 }
 
+# Function to detect if the Web UI server is running
+detect_web_ui() {
+    # Check common web UI ports
+    for PORT in 8080 9090; do
+        if command -v curl &> /dev/null; then
+            if curl -s --max-time 1 "http://127.0.0.1:$PORT/api/stats" > /dev/null 2>&1; then
+                echo "Web UI: Running at http://localhost:$PORT"
+                echo "  Dashboard: http://localhost:$PORT/"
+                echo "  Use deep links after executions: http://localhost:$PORT/#/executions/<id>"
+                return 0
+            fi
+        elif command -v nc &> /dev/null; then
+            if nc -z 127.0.0.1 "$PORT" 2>/dev/null; then
+                echo "Web UI: Running at http://localhost:$PORT"
+                echo "  Dashboard: http://localhost:$PORT/"
+                echo "  Use deep links after executions: http://localhost:$PORT/#/executions/<id>"
+                return 0
+            fi
+        fi
+    done
+
+    # Check PID file
+    PID_FILE="$PROJECT_DIR/data/.web_ui.pid"
+    if [ -f "$PID_FILE" ]; then
+        WEB_PID=$(cat "$PID_FILE")
+        if kill -0 "$WEB_PID" 2>/dev/null; then
+            echo "Web UI: Background process running (PID $WEB_PID)"
+            return 0
+        else
+            # Stale PID file
+            rm -f "$PID_FILE"
+        fi
+    fi
+
+    echo "Web UI: Not running"
+    echo "  Launch: poetry run cloak --web-ui --background"
+    echo "  The Web UI shows full sensitive data in the browser (outside AI context)"
+    return 0
+}
+
 # Output context based on session source
 echo "=== CLOAK Session Context ==="
 echo ""
@@ -133,6 +173,11 @@ validate_aws
 
 echo ""
 
+# Detect Web UI status
+detect_web_ui
+
+echo ""
+
 # Show recent executions for context continuity
 get_recent_executions
 
@@ -142,8 +187,9 @@ echo ""
 echo "Core Rules:"
 echo "  - Dry-run by default: Always preview with --technique before using --execute"
 echo "  - Privacy-first: Sensitive data stays in data/cloak.db, only summaries shown"
+echo "  - Web UI preferred: Direct users to Web UI deep links for full details"
 echo "  - Confirmation required: User must approve before any AWS API calls"
-echo "  - Use --execution-info <id> to fetch sensitive details when requested"
+echo "  - Use --execution-info <id> as CLI fallback for sensitive details"
 
 # Exit 0 to allow session to proceed - stdout becomes Claude's context
 exit 0

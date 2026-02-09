@@ -27,6 +27,8 @@ sqlalchemy = "^2.0"
 pydantic = "^2.0"
 pydantic-settings = "^2.0"
 structlog = "^24.0"
+fastapi = "^0.115"
+uvicorn = {extras = ["standard"], version = "^0.34"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

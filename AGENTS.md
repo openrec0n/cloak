@@ -11,6 +11,7 @@ CLOAK is an AI-powered cloud security tool for AWS. It integrates with Claude Co
 - Poetry (package management)
 - boto3 (AWS SDK)
 - SQLAlchemy + SQLite (database)
+- FastAPI + uvicorn (Web UI server)
 - moto (AWS mocking for tests)
 - pytest (testing)
 - structlog (logging)
@@ -48,6 +49,8 @@ class MyTechnique(BaseTechnique):
 | `cloak/core/database.py` | Database layer |
 | `cloak/core/registry.py` | Technique registry |
 | `cloak/cli/runner.py` | CLI entry point |
+| `cloak/web/server.py` | Web UI FastAPI server |
+| `cloak/web/static/index.html` | Web UI single-page application |
 | `docs/DEVELOPMENT.md` | Technique implementation guide |
 
 ## Commands
@@ -66,6 +69,11 @@ poetry run python -m cloak.cli --list-services
 poetry run python -m cloak.cli --list-techniques s3
 poetry run python -m cloak.cli --technique s3.list_buckets --execute
 poetry run python -m cloak.cli --generate-registry
+
+# Web UI
+poetry run python -m cloak.cli --web-ui                # Launch dashboard
+poetry run python -m cloak.cli --web-ui --background    # Launch in background
+poetry run python -m cloak.cli --web-ui --port 9090     # Custom port
 ```
 
 ## Code Style

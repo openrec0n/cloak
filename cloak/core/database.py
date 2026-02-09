@@ -255,8 +255,8 @@ def get_execution_stats(session: Session) -> dict:
     from cloak.core.models import Execution
 
     total = session.query(Execution).count()
-    completed = session.query(Execution).filter(Execution.status == "COMPLETED").count()
-    failed = session.query(Execution).filter(Execution.status == "FAILED").count()
+    completed = session.query(Execution).filter(Execution.status == "completed").count()
+    failed = session.query(Execution).filter(Execution.status == "failed").count()
 
     return {
         "total_executions": total,

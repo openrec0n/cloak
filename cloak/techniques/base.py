@@ -149,9 +149,13 @@ class ExecutionResult:
     duration_seconds: float = 0.0
     error_message: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
+    def to_dict(self, web_ui_port: int = 8080) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Args:
+            web_ui_port: Port the web UI runs on, for generating deep links.
+        """
+        result: dict[str, Any] = {
             "execution_id": self.execution_id,
             "success": self.success,
             "summary": self.summary,
@@ -159,7 +163,9 @@ class ExecutionResult:
             "finding_count": self.finding_count,
             "duration_seconds": round(self.duration_seconds, 2),
             "error_message": self.error_message,
+            "web_ui_url": (f"http://localhost:{web_ui_port}/#/executions/{self.execution_id}"),
         }
+        return result
 
     @classmethod
     def from_error(cls, execution_id: str, error_message: str) -> ExecutionResult:

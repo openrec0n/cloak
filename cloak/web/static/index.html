@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLOAK // Command Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Variables ──────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: #060a12;
+  --bg-base: #0b1120;
+  --bg-surface: #111a2e;
+  --bg-elevated: #182240;
+  --border: #1e2d4a;
+  --border-bright: #2a3f6a;
+
+  --cyan: #00e5ff;
+  --cyan-dim: #00899a;
+  --cyan-glow: rgba(0, 229, 255, 0.15);
+  --green: #00e676;
+  --green-dim: #00944d;
+
+  --text-primary: #d8e2ef;
+  --text-secondary: #7a8ba5;
+  --text-muted: #4a5a73;
+
+  --sev-critical: #ff1744;
+  --sev-high: #ff6d00;
+  --sev-medium: #ffab00;
+  --sev-low: #2979ff;
+  --sev-info: #546e7a;
+
+  --status-completed: #00e676;
+  --status-failed: #ff1744;
+  --status-running: #ffab00;
+  --status-pending: #546e7a;
+
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Share Tech Mono', monospace;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --transition: 180ms ease;
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Ambient Background ─────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0, 229, 255, 0.03) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 70%, rgba(0, 229, 255, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Grid pattern overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-base);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  position: relative;
+}
+
+.logo-block {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 6px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+}
+
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+.nav-items {
+  padding: 16px 0;
+  flex: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: all var(--transition);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  position: relative;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.nav-item.active {
+  color: var(--cyan);
+  border-left-color: var(--cyan);
+  background: rgba(0, 229, 255, 0.06);
+}
+
+.nav-item .nav-icon {
+  width: 18px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  margin-right: 6px;
+}
+
+/* ── Main Content ───────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.main::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+.content {
+  padding: 32px 40px;
+  max-width: 1400px;
+}
+
+/* ── Page Header ────────────────────────────────────────────────── */
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: 3px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title .accent {
+  color: var(--cyan);
+}
+
+.page-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-weight: 300;
+}
+
+/* ── Stat Cards ─────────────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.stat-card:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+}
+
+.stat-card:hover::before { opacity: 1; }
+
+.stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-value.cyan { color: var(--cyan); }
+.stat-value.green { color: var(--green); }
+
+.stat-detail {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  font-family: var(--font-mono);
+}
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+.table-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+
+td {
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(30, 45, 74, 0.4);
+  vertical-align: middle;
+}
+
+tr {
+  transition: background var(--transition);
+}
+
+tbody tr:hover {
+  background: rgba(0, 229, 255, 0.03);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: rgba(0, 229, 255, 0.06) !important;
+}
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-completed {
+  background: rgba(0, 230, 118, 0.1);
+  color: var(--status-completed);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+}
+
+.badge-failed {
+  background: rgba(255, 23, 68, 0.1);
+  color: var(--status-failed);
+  border: 1px solid rgba(255, 23, 68, 0.2);
+}
+
+.badge-running {
+  background: rgba(255, 171, 0, 0.1);
+  color: var(--status-running);
+  border: 1px solid rgba(255, 171, 0, 0.2);
+}
+
+.badge-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-running);
+  animation: pulse 1.5s infinite;
+}
+
+.badge-pending {
+  background: rgba(84, 110, 122, 0.1);
+  color: var(--status-pending);
+  border: 1px solid rgba(84, 110, 122, 0.2);
+}
+
+/* Severity badges */
+.sev-critical {
+  background: rgba(255, 23, 68, 0.1);
+  color: var(--sev-critical);
+  border: 1px solid rgba(255, 23, 68, 0.25);
+}
+
+.sev-high {
+  background: rgba(255, 109, 0, 0.1);
+  color: var(--sev-high);
+  border: 1px solid rgba(255, 109, 0, 0.25);
+}
+
+.sev-medium {
+  background: rgba(255, 171, 0, 0.1);
+  color: var(--sev-medium);
+  border: 1px solid rgba(255, 171, 0, 0.25);
+}
+
+.sev-low {
+  background: rgba(41, 121, 255, 0.1);
+  color: var(--sev-low);
+  border: 1px solid rgba(41, 121, 255, 0.25);
+}
+
+.sev-info {
+  background: rgba(84, 110, 122, 0.1);
+  color: var(--sev-info);
+  border: 1px solid rgba(84, 110, 122, 0.25);
+}
+
+/* ── Detail Page ────────────────────────────────────────────────── */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.detail-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.detail-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.detail-value.summary-text {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 12px 24px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+  letter-spacing: 0.5px;
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+}
+
+.tab-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+/* ── Filters ────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.filter-select:hover,
+.filter-select:focus {
+  border-color: var(--border-bright);
+  outline: none;
+}
+
+.filter-select option {
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+.export-btn {
+  background: transparent;
+  border: 1px solid var(--cyan);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  letter-spacing: 0.03em;
+}
+
+.export-btn:hover {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: var(--cyan);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+}
+
+.load-more-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.load-more-btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Severity Bar Chart ─────────────────────────────────────────── */
+.severity-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.severity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.severity-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  width: 70px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.severity-bar-track {
+  flex: 1;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.severity-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+
+.severity-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1));
+}
+
+.severity-count {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+}
+
+.breadcrumb a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.breadcrumb a:hover {
+  color: var(--cyan);
+}
+
+.breadcrumb .sep {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.breadcrumb .current {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* ── Back Link ──────────────────────────────────────────────────── */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  margin-bottom: 20px;
+  transition: color var(--transition);
+}
+
+.back-link:hover {
+  color: var(--cyan);
+}
+
+/* ── Error State ─────────────────────────────────────────────────── */
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 23, 68, 0.3);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 23, 68, 0.05);
+}
+
+.error-state .error-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+  color: var(--sev-critical);
+  opacity: 0.8;
+}
+
+.error-state h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  color: var(--sev-critical);
+}
+
+.error-state p {
+  font-size: 0.82rem;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ── Empty State ────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state .empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.empty-state h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  font-size: 0.82rem;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ── Loading ────────────────────────────────────────────────────── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  gap: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-in {
+  animation: fadeInUp 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.delay-1 { animation-delay: 50ms; }
+.delay-2 { animation-delay: 100ms; }
+.delay-3 { animation-delay: 150ms; }
+.delay-4 { animation-delay: 200ms; }
+.delay-5 { animation-delay: 250ms; }
+
+/* ── JSON/Data Display ──────────────────────────────────────────── */
+.json-display {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+/* ── Technique Tag ──────────────────────────────────────────────── */
+.technique-tag {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--cyan);
+}
+
+.service-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: rgba(0, 229, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* ── Timestamp ──────────────────────────────────────────────────── */
+.ts {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Counts ─────────────────────────────────────────────────────── */
+.count-pair {
+  display: flex;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.count-pair span {
+  color: var(--text-muted);
+}
+
+.count-pair .num {
+  color: var(--text-primary);
+}
+
+/* ── Section Divider ────────────────────────────────────────────── */
+.section-gap { margin-bottom: 32px; }
+
+/* ── Finding detail ─────────────────────────────────────────────── */
+.finding-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.finding-title-bar h2 {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ── Agent Status Banner ────────────────────────────────────────── */
+.agent-status-banner {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+
+/* ── Connection Lost Banner ─────────────────────────────────────── */
+.connection-lost-banner {
+  position: fixed;
+  top: 0;
+  left: 220px;
+  right: 0;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--sev-high);
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  color: var(--sev-high);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 100;
+}
+.connection-lost-banner button {
+  background: transparent;
+  border: 1px solid var(--sev-high);
+  color: var(--sev-high);
+  padding: 2px 10px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.connection-lost-banner button:hover {
+  background: rgba(255, 109, 0, 0.15);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { width: 60px; min-width: 60px; }
+  .logo-name, .logo-sub, .nav-item span, .sidebar-footer span { display: none; }
+  .nav-item { justify-content: center; padding: 12px; }
+  .nav-item .nav-icon { margin: 0; }
+  .content { padding: 24px 20px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .agent-status-banner { left: 60px; }
+  .connection-lost-banner { left: 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo-block">
+    <div class="logo-name">CLOAK</div>
+    <div class="logo-sub">COMMAND CONSOLE</div>
+  </div>
+  <nav class="nav-items">
+    <a class="nav-item" href="#/" data-nav="dashboard">
+      <span class="nav-icon">&#9670;</span>
+      <span>Dashboard</span>
+    </a>
+    <a class="nav-item" href="#/executions" data-nav="executions">
+      <span class="nav-icon">&#9654;</span>
+      <span>Executions</span>
+    </a>
+    <a class="nav-item" href="#/findings" data-nav="findings">
+      <span class="nav-icon">&#9888;</span>
+      <span>Findings</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>
+    <span>CLOAK v0.1.0</span>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<main class="main">
+  <div class="content" id="app">
+    <div class="loading"><div class="loading-spinner"></div> Initializing...</div>
+  </div>
+</main>
+
+<script>
+/* ================================================================
+   CLOAK Web UI – Client-Side SPA
+   ================================================================ */
+
+const $ = (sel, ctx = document) => ctx.querySelector(sel);
+const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+
+// ── API Layer ──────────────────────────────────────────────────
+const API_TIMEOUT_MS = 30000;
+
+const api = {
+  async get(path) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`/api${path}`, { signal: controller.signal });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('Request timed out — server may be unresponsive.');
+      throw new Error('Network error — check that the server is running.');
+    }
+    clearTimeout(timer);
+    const text = await res.text();
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`;
+      try {
+        if (text) {
+          const body = JSON.parse(text);
+          if (body.error) message = body.error;
+        }
+      } catch (_) {
+        if (text && text.length < 200) message = text;
+      }
+      const err = new Error(message);
+      err.status = res.status;
+      throw err;
+    }
+    return text ? JSON.parse(text) : null;
+  },
+  async post(path, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`/api${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('Request timed out — server may be unresponsive.');
+      throw new Error('Network error — check that the server is running.');
+    }
+    clearTimeout(timer);
+    const text = await res.text();
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`;
+      try {
+        if (text) {
+          const data = JSON.parse(text);
+          if (data.error) message = data.error;
+        }
+      } catch (_) {
+        if (text && text.length < 200) message = text;
+      }
+      throw new Error(message);
+    }
+    return text ? JSON.parse(text) : null;
+  }
+};
+
+// ── Helpers ────────────────────────────────────────────────────
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function statusBadge(status) {
+  const s = (status || '').toLowerCase();
+  return `<span class="badge badge-${s}">${status}</span>`;
+}
+
+function sevBadge(severity) {
+  const s = (severity || '').toLowerCase();
+  return `<span class="badge sev-${s}">${severity}</span>`;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatJson(obj) {
+  return escHtml(JSON.stringify(obj, null, 2));
+}
+
+function showError(app, message) {
+  app.innerHTML = `
+    <div class="error-state animate-in">
+      <div class="error-icon">&#9888;</div>
+      <h3>LOAD ERROR</h3>
+      <p>${escHtml(message)}</p>
+      <p style="margin-top:16px;font-size:0.75rem;">Check that the CLOAK Web UI server is running and try again.</p>
+    </div>`;
+}
+
+// ── Router ─────────────────────────────────────────────────────
+const routes = {};
+let currentView = null;
+let _refreshTimer = null;
+
+function route(pattern, handler) {
+  routes[pattern] = handler;
+}
+
+function navigate() {
+  const hash = location.hash || '#/';
+  const app = $('#app');
+
+  // Find matching route
+  for (const [pattern, handler] of Object.entries(routes)) {
+    const regex = new RegExp('^' + pattern.replace(/:(\w+)/g, '([^/]+)') + '$');
+    const match = hash.match(regex);
+    if (match) {
+      const params = match.slice(1);
+      currentView = pattern;
+      const p = handler(app, ...params);
+      if (p && typeof p.catch === 'function') {
+        p.catch((err) => showError(app, err.message || 'Request failed'));
+      }
+      updateNav(hash);
+      return;
+    }
+  }
+
+  // Default to dashboard
+  location.hash = '#/';
+}
+
+/**
+ * Debounced view refresh for SSE/WebSocket events.
+ * Coalesces rapid events into a single navigate() call after 500ms of quiet,
+ * preventing filter/scroll/pagination state from being clobbered repeatedly.
+ */
+function debouncedRefresh() {
+  if (_refreshTimer) clearTimeout(_refreshTimer);
+  _refreshTimer = setTimeout(() => {
+    _refreshTimer = null;
+    navigate();
+  }, 500);
+}
+
+function updateNav(hash) {
+  $$('.nav-item').forEach(el => {
+    const href = el.getAttribute('href');
+    const isActive = hash === href || (href !== '#/' && hash.startsWith(href));
+    el.classList.toggle('active', isActive);
+  });
+  // Dashboard special case
+  if (hash === '#/') {
+    $('[data-nav="dashboard"]').classList.add('active');
+  }
+}
+
+// ── Dashboard View ─────────────────────────────────────────────
+route('#/', async (app) => {
+  app.innerHTML = '<div class="loading"><div class="loading-spinner"></div> Loading dashboard...</div>';
+
+  const stats = await api.get('/stats');
+  const execData = await api.get('/executions?limit=8');
+  const recentExecs = execData.executions || [];
+
+  const sevOrder = ['critical', 'high', 'medium', 'low', 'info'];
+  const sevColors = {
+    critical: 'var(--sev-critical)',
+    high: 'var(--sev-high)',
+    medium: 'var(--sev-medium)',
+    low: 'var(--sev-low)',
+    info: 'var(--sev-info)'
+  };
+  const maxSev = Math.max(1, ...sevOrder.map(s => stats.findings_by_severity[s] || 0));
+
+  const sevBars = sevOrder.map(s => {
+    const count = stats.findings_by_severity[s] || 0;
+    const pct = (count / maxSev) * 100;
+    return `
+      <div class="severity-row">
+        <div class="severity-label" style="color:${sevColors[s]}">${s}</div>
+        <div class="severity-bar-track">
+          <div class="severity-bar-fill" style="width:${pct}%;background:${sevColors[s]}" data-width="${pct}"></div>
+        </div>
+        <div class="severity-count" style="color:${sevColors[s]}">${count}</div>
+      </div>`;
+  }).join('');
+
+  const svcEntries = Object.entries(stats.executions_by_service || {});
+  const svcRows = svcEntries.length > 0
+    ? svcEntries.map(([svc, count]) => `
+        <tr>
+          <td><span class="service-tag">${escHtml(svc)}</span></td>
+          <td class="ts">${count}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="2" style="color:var(--text-muted);text-align:center;padding:20px;">No data</td></tr>';
+
+  const execRows = recentExecs.length > 0
+    ? recentExecs.map(e => `
+        <tr class="clickable-row" onclick="location.hash='#/executions/${e.id}'">
+          <td>${statusBadge(e.status)}</td>
+          <td><span class="technique-tag">${escHtml(e.technique_name)}</span></td>
+          <td class="ts">${timeAgo(e.started_at)}</td>
+          <td class="count-pair">
+            <span><span class="num">${e.asset_count}</span> assets</span>
+            <span><span class="num">${e.finding_count}</span> findings</span>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">&#9670;</div><h3>NO EXECUTIONS</h3><p>Run a technique with --execute to see results here.</p></div></td></tr>';
+
+  app.innerHTML = `
+    <div class="page-header animate-in">
+      <div class="page-title"><span class="accent">&#9670;</span> DASHBOARD</div>
+      <div class="page-subtitle">Security assessment overview</div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card animate-in delay-1">
+        <div class="stat-label">Total Executions</div>
+        <div class="stat-value cyan">${stats.total_executions}</div>
+        <div class="stat-detail">${stats.completed} completed &middot; ${stats.failed} failed</div>
+      </div>
+      <div class="stat-card animate-in delay-2">
+        <div class="stat-label">Total Findings</div>
+        <div class="stat-value">${stats.total_findings}</div>
+        <div class="stat-detail">${stats.findings_by_severity.critical || 0} critical &middot; ${stats.findings_by_severity.high || 0} high</div>
+      </div>
+      <div class="stat-card animate-in delay-3">
+        <div class="stat-label">Total Assets</div>
+        <div class="stat-value">${stats.total_assets}</div>
+        <div class="stat-detail">Across ${svcEntries.length} service${svcEntries.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="stat-card animate-in delay-4">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value green">${(stats.success_rate * 100).toFixed(0)}%</div>
+        <div class="stat-detail">${stats.completed} / ${stats.total_executions} executions</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;" class="section-gap">
+      <div class="table-container animate-in delay-3">
+        <div class="table-header">
+          <div class="table-title">FINDINGS BY SEVERITY</div>
+        </div>
+        <div style="padding:20px;">
+          <div class="severity-chart">${sevBars}</div>
+        </div>
+      </div>
+      <div class="table-container animate-in delay-4">
+        <div class="table-header">
+          <div class="table-title">BY SERVICE</div>
+        </div>
+        <table>
+          <thead><tr><th>Service</th><th>Runs</th></tr></thead>
+          <tbody>${svcRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="table-container animate-in delay-5">
+      <div class="table-header">
+        <div class="table-title">RECENT EXECUTIONS</div>
+        <a href="#/executions" style="font-size:0.75rem;color:var(--cyan);text-decoration:none;font-family:var(--font-mono);">View all &rarr;</a>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Technique</th><th>When</th><th>Results</th></tr>
+        </thead>
+        <tbody>${execRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // Animate severity bars from 0
+  requestAnimationFrame(() => {
+    $$('.severity-bar-fill').forEach(el => {
+      const w = el.dataset.width;
+      el.style.width = '0%';
+      requestAnimationFrame(() => { el.style.width = w + '%'; });
+    });
+  });
+});
+
+// ── Executions List ────────────────────────────────────────────
+route('#/executions', async (app) => {
+  app.innerHTML = '<div class="loading"><div class="loading-spinner"></div> Loading executions...</div>';
+
+  const PAGE_SIZE = 50;
+  const [stats, initialData] = await Promise.all([
+    api.get('/stats'),
+    api.get(`/executions?limit=${PAGE_SIZE}&offset=0`),
+  ]);
+  let allExecutions = initialData.executions || [];
+  let total = initialData.total ?? allExecutions.length;
+
+  const statuses = ['completed', 'failed', 'pending', 'running'];
+  const services = Object.keys(stats.executions_by_service || {}).sort();
+
+  const svcOptions = services.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+  const statusOptions = statuses.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  function renderRows(execs) {
+    if (execs.length === 0) {
+      return '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">&#9654;</div><h3>NO MATCHING EXECUTIONS</h3><p>Try adjusting the filters.</p></div></td></tr>';
+    }
+    return execs.map(e => `
+      <tr class="clickable-row" onclick="location.hash='#/executions/${e.id}'">
+        <td>${statusBadge(e.status)}</td>
+        <td><span class="technique-tag">${escHtml(e.technique_name)}</span></td>
+        <td><span class="service-tag">${escHtml(e.service)}</span></td>
+        <td class="ts" title="${formatTime(e.started_at)}">${timeAgo(e.started_at)}</td>
+        <td style="text-align:center;font-family:var(--font-mono);font-size:0.8rem;">${e.asset_count}</td>
+        <td style="text-align:center;font-family:var(--font-mono);font-size:0.8rem;">${e.finding_count}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadExecutions(status, service, offset = 0) {
+    let path = `/executions?limit=${PAGE_SIZE}&offset=${offset}`;
+    if (status) path += '&status=' + encodeURIComponent(status);
+    if (service) path += '&service=' + encodeURIComponent(service);
+    return api.get(path);
+  }
+
+  function renderPage(data, append = false) {
+    const execs = data.executions || [];
+    total = data.total ?? total;
+    if (!append) allExecutions = execs;
+    else allExecutions = allExecutions.concat(execs);
+
+    $('.page-subtitle', app).textContent = `${total} total execution${total !== 1 ? 's' : ''}`;
+    $('#exec-tbody').innerHTML = renderRows(allExecutions);
+
+    const loadMoreBtn = $('#exec-load-more');
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = allExecutions.length >= total ? 'none' : 'block';
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = `Load more (${allExecutions.length} of ${total})`;
+    }
+  }
+
+  const hasMore = allExecutions.length < total;
+
+  app.innerHTML = `
+    <div class="page-header animate-in">
+      <div class="page-title"><span class="accent">&#9654;</span> EXECUTIONS</div>
+      <div class="page-subtitle">${total} total execution${total !== 1 ? 's' : ''}</div>
+    </div>
+
+    <div class="table-container animate-in delay-1">
+      <div class="table-header">
+        <div class="table-title">ALL EXECUTIONS</div>
+        <div class="filters">
+          <select class="filter-select" id="filter-status">
+            <option value="">All statuses</option>
+            ${statusOptions}
+          </select>
+          <select class="filter-select" id="filter-service">
+            <option value="">All services</option>
+            ${svcOptions}
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Technique</th>
+            <th>Service</th>
+            <th>Started</th>
+            <th style="text-align:center">Assets</th>
+            <th style="text-align:center">Findings</th>
+          </tr>
+        </thead>
+        <tbody id="exec-tbody">${renderRows(allExecutions)}</tbody>
+      </table>
+      <button class="load-more-btn" id="exec-load-more" style="display:${hasMore ? 'block' : 'none'}">Load more (${allExecutions.length} of ${total})</button>
+    </div>
+  `;
+
+  const filterStatus = $('#filter-status');
+  const filterService = $('#filter-service');
+
+  async function applyFilters() {
+    allExecutions = [];
+    const status = filterStatus.value;
+    const service = filterService.value;
+    $('#exec-tbody').innerHTML = '<tr><td colspan="6"><div class="loading"><div class="loading-spinner"></div> Loading...</div></td></tr>';
+    const loadMoreEl = $('#exec-load-more');
+    if (loadMoreEl) loadMoreEl.style.display = 'none';
+    const data = await loadExecutions(status || undefined, service || undefined, 0);
+    renderPage(data);
+  }
+
+  filterStatus.addEventListener('change', applyFilters);
+  filterService.addEventListener('change', applyFilters);
+
+  $('#exec-load-more')?.addEventListener('click', async () => {
+    const btn = $('#exec-load-more');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    const status = filterStatus.value;
+    const service = filterService.value;
+    const data = await loadExecutions(status || undefined, service || undefined, allExecutions.length);
+    renderPage(data, true);
+  });
+});
+
+// ── Execution Detail ───────────────────────────────────────────
+route('#/executions/:id', async (app, id) => {
+  app.innerHTML = '<div class="loading"><div class="loading-spinner"></div> Loading execution...</div>';
+
+  let exec;
+  try {
+    exec = await api.get(`/executions/${id}`);
+  } catch (err) {
+    if (err.status === 404) {
+      app.innerHTML = `
+        <a class="back-link" href="#/executions">&larr; Back to executions</a>
+        <div class="empty-state"><div class="empty-icon">?</div><h3>NOT FOUND</h3><p>Execution ${escHtml(id)} was not found.</p></div>
+      `;
+      return;
+    }
+    throw err;
+  }
+
+  const assets = exec.assets || [];
+  const findings = exec.findings || [];
+
+  const duration = exec.started_at && exec.completed_at
+    ? ((new Date(exec.completed_at) - new Date(exec.started_at)) / 1000).toFixed(1) + 's'
+    : '—';
+
+  const assetRows = assets.length > 0
+    ? assets.map(a => `
+        <tr>
+          <td><span class="service-tag">${escHtml(a.resource_type)}</span></td>
+          <td style="font-family:var(--font-mono);font-size:0.78rem;">${escHtml(a.name || a.resource_id)}</td>
+          <td class="ts">${escHtml(a.region || '—')}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="3"><div class="empty-state" style="padding:30px;"><h3>NO ASSETS</h3></div></td></tr>';
+
+  const findingRows = findings.length > 0
+    ? findings.map(f => `
+        <tr class="clickable-row" onclick="location.hash='#/findings/${f.id}'">
+          <td>${sevBadge(f.severity)}</td>
+          <td style="font-size:0.82rem;">${escHtml(f.title)}</td>
+          <td><span class="service-tag">${escHtml(f.resource_type)}</span></td>
+        </tr>`).join('')
+    : '<tr><td colspan="3"><div class="empty-state" style="padding:30px;"><h3>NO FINDINGS</h3></div></td></tr>';
+
+  app.innerHTML = `
+    <div class="breadcrumb animate-in">
+      <a href="#/executions">Executions</a>
+      <span class="sep">/</span>
+      <span class="current">${escHtml(exec.technique_name)}</span>
+    </div>
+
+    <div class="page-header animate-in delay-1">
+      <div class="page-title">
+        <span class="accent">&#9654;</span>
+        ${escHtml(exec.technique_name)}
+        ${statusBadge(exec.status)}
+        <button class="export-btn" onclick="window.open('/api/export/executions/${escHtml(exec.id)}', '_blank')" title="Export execution as JSON">&#8615; Export</button>
+      </div>
+      <div class="page-subtitle">Execution ${escHtml(exec.id)}</div>
+    </div>
+
+    <div class="detail-grid animate-in delay-2">
+      <div class="detail-card">
+        <div class="detail-label">Service</div>
+        <div class="detail-value">${escHtml(exec.service)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Duration</div>
+        <div class="detail-value">${duration}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Started</div>
+        <div class="detail-value">${formatTime(exec.started_at)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Completed</div>
+        <div class="detail-value">${formatTime(exec.completed_at)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">AWS Account</div>
+        <div class="detail-value">${escHtml(exec.aws_account_id)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Identity ARN</div>
+        <div class="detail-value">${escHtml(exec.aws_identity_arn)}</div>
+      </div>
+      ${exec.summary ? `
+      <div class="detail-card full-width">
+        <div class="detail-label">Summary</div>
+        <div class="detail-value summary-text">${escHtml(exec.summary)}</div>
+      </div>` : ''}
+      ${exec.error_message ? `
+      <div class="detail-card full-width" style="border-color:rgba(255,23,68,0.3);">
+        <div class="detail-label" style="color:var(--sev-critical);">Error</div>
+        <div class="detail-value" style="color:var(--sev-critical);">${escHtml(exec.error_message)}</div>
+      </div>` : ''}
+    </div>
+
+    <div class="table-container animate-in delay-3">
+      <div class="tabs" id="detail-tabs">
+        <div class="tab active" data-tab="assets">Assets <span class="tab-count">${assets.length}</span></div>
+        <div class="tab" data-tab="findings">Findings <span class="tab-count">${findings.length}</span></div>
+        <div class="tab" data-tab="config">Config</div>
+      </div>
+
+      <div id="tab-assets">
+        <table>
+          <thead><tr><th>Type</th><th>Name / ID</th><th>Region</th></tr></thead>
+          <tbody>${assetRows}</tbody>
+        </table>
+      </div>
+
+      <div id="tab-findings" style="display:none;">
+        <table>
+          <thead><tr><th>Severity</th><th>Title</th><th>Resource Type</th></tr></thead>
+          <tbody>${findingRows}</tbody>
+        </table>
+      </div>
+
+      <div id="tab-config" style="display:none;padding:20px;">
+        <div class="json-display">${formatJson(exec.config || {})}</div>
+      </div>
+    </div>
+  `;
+
+  // Tab switching
+  $$('#detail-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      $$('#detail-tabs .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      ['assets', 'findings', 'config'].forEach(t => {
+        const el = $(`#tab-${t}`);
+        if (el) el.style.display = t === target ? '' : 'none';
+      });
+    });
+  });
+});
+
+// ── Findings List ──────────────────────────────────────────────
+route('#/findings', async (app) => {
+  app.innerHTML = '<div class="loading"><div class="loading-spinner"></div> Loading findings...</div>';
+
+  const PAGE_SIZE = 50;
+  const [initialData, stats] = await Promise.all([
+    api.get(`/findings?limit=${PAGE_SIZE}&offset=0`),
+    api.get('/stats'),
+  ]);
+  let allFindings = initialData.findings || [];
+  let total = initialData.total ?? allFindings.length;
+
+  const severities = ['critical', 'high', 'medium', 'low', 'info'];
+  const sevOptions = severities.map(s => `<option value="${s}">${s}</option>`).join('');
+  const types = (stats.finding_types || []).sort();
+  const typeOptions = types.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+
+  function renderRows(items) {
+    if (items.length === 0) {
+      return '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">&#9888;</div><h3>NO MATCHING FINDINGS</h3><p>Try adjusting the filters.</p></div></td></tr>';
+    }
+    return items.map(f => `
+      <tr class="clickable-row" onclick="location.hash='#/findings/${f.id}'">
+        <td>${sevBadge(f.severity)}</td>
+        <td style="font-size:0.82rem;">${escHtml(f.title)}</td>
+        <td><span class="service-tag">${escHtml(f.resource_type)}</span></td>
+        <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">${escHtml(f.finding_type)}</td>
+        <td class="ts">${timeAgo(f.created_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadFindings(severity, findingType, offset = 0) {
+    let path = `/findings?limit=${PAGE_SIZE}&offset=${offset}`;
+    if (severity) path += '&severity=' + encodeURIComponent(severity);
+    if (findingType) path += '&finding_type=' + encodeURIComponent(findingType);
+    return api.get(path);
+  }
+
+  function renderPage(data, append = false) {
+    const items = data.findings || [];
+    total = data.total ?? total;
+    if (!append) allFindings = items;
+    else allFindings = allFindings.concat(items);
+
+    $('.page-subtitle', app).textContent = `${total} total finding${total !== 1 ? 's' : ''}`;
+    $('#findings-tbody').innerHTML = renderRows(allFindings);
+
+    const loadMoreBtn = $('#findings-load-more');
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = allFindings.length >= total ? 'none' : 'block';
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = `Load more (${allFindings.length} of ${total})`;
+    }
+  }
+
+  const hasMore = allFindings.length < total;
+
+  app.innerHTML = `
+    <div class="page-header animate-in">
+      <div class="page-title"><span class="accent">&#9888;</span> FINDINGS</div>
+      <div class="page-subtitle">${total} total finding${total !== 1 ? 's' : ''}</div>
+    </div>
+
+    <div class="table-container animate-in delay-1">
+      <div class="table-header">
+        <div class="table-title">ALL FINDINGS</div>
+        <div class="filters">
+          <select class="filter-select" id="filter-sev">
+            <option value="">All severities</option>
+            ${sevOptions}
+          </select>
+          <select class="filter-select" id="filter-type">
+            <option value="">All types</option>
+            ${typeOptions}
+          </select>
+          <button class="export-btn" id="export-findings-btn" title="Export findings as JSON">&#8615; Export JSON</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Title</th>
+            <th>Resource</th>
+            <th>Type</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="findings-tbody">${renderRows(allFindings)}</tbody>
+      </table>
+      <button class="load-more-btn" id="findings-load-more" style="display:${hasMore ? 'block' : 'none'}">Load more (${allFindings.length} of ${total})</button>
+    </div>
+  `;
+
+  const filterSev = $('#filter-sev');
+  const filterType = $('#filter-type');
+
+  async function applyFilters() {
+    allFindings = [];
+    const sev = filterSev.value;
+    const type = filterType.value;
+    $('#findings-tbody').innerHTML = '<tr><td colspan="5"><div class="loading"><div class="loading-spinner"></div> Loading...</div></td></tr>';
+    const loadMoreEl = $('#findings-load-more');
+    if (loadMoreEl) loadMoreEl.style.display = 'none';
+    const data = await loadFindings(sev || undefined, type || undefined, 0);
+    renderPage(data);
+  }
+
+  filterSev.addEventListener('change', applyFilters);
+  filterType.addEventListener('change', applyFilters);
+
+  $('#findings-load-more')?.addEventListener('click', async () => {
+    const btn = $('#findings-load-more');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    const sev = filterSev.value;
+    const type = filterType.value;
+    const data = await loadFindings(sev || undefined, type || undefined, allFindings.length);
+    renderPage(data, true);
+  });
+
+  // Export button
+  $('#export-findings-btn').addEventListener('click', () => {
+    const sev = filterSev.value;
+    const type = filterType.value;
+    const params = new URLSearchParams();
+    if (sev) params.set('severity', sev);
+    if (type) params.set('finding_type', type);
+    const qs = params.toString();
+    window.open('/api/export/findings' + (qs ? '?' + qs : ''), '_blank');
+  });
+});
+
+// ── Finding Detail ─────────────────────────────────────────────
+route('#/findings/:id', async (app, id) => {
+  app.innerHTML = '<div class="loading"><div class="loading-spinner"></div> Loading finding...</div>';
+
+  let finding;
+  try {
+    finding = await api.get(`/findings/${id}`);
+  } catch (err) {
+    if (err.status === 404) {
+      app.innerHTML = `
+        <a class="back-link" href="#/findings">&larr; Back to findings</a>
+        <div class="empty-state"><div class="empty-icon">?</div><h3>NOT FOUND</h3><p>Finding ${escHtml(id)} was not found.</p></div>
+      `;
+      return;
+    }
+    throw err;
+  }
+
+  const execInfo = finding.execution
+    ? `<a href="#/executions/${finding.execution.id}" style="color:var(--cyan);text-decoration:none;font-family:var(--font-mono);font-size:0.82rem;">
+        ${escHtml(finding.execution.technique_name)} &rarr;
+       </a>`
+    : '—';
+
+  app.innerHTML = `
+    <div class="breadcrumb animate-in">
+      <a href="#/findings">Findings</a>
+      <span class="sep">/</span>
+      <span class="current">${escHtml((finding.title || '').substring(0, 50))}${(finding.title || '').length > 50 ? '...' : ''}</span>
+    </div>
+
+    <div class="finding-title-bar animate-in delay-1">
+      ${sevBadge(finding.severity)}
+      <h2>${escHtml(finding.title)}</h2>
+    </div>
+
+    <div class="detail-grid animate-in delay-2">
+      <div class="detail-card full-width">
+        <div class="detail-label">Description</div>
+        <div class="detail-value summary-text">${escHtml(finding.description)}</div>
+      </div>
+
+      ${finding.recommendation ? `
+      <div class="detail-card full-width" style="border-left:3px solid var(--cyan);">
+        <div class="detail-label">Recommendation</div>
+        <div class="detail-value summary-text">${escHtml(finding.recommendation)}</div>
+      </div>` : ''}
+
+      <div class="detail-card">
+        <div class="detail-label">Resource Type</div>
+        <div class="detail-value">${escHtml(finding.resource_type)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Resource ID</div>
+        <div class="detail-value">${escHtml(finding.resource_id)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Finding Type</div>
+        <div class="detail-value">${escHtml(finding.finding_type)}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Region</div>
+        <div class="detail-value">${escHtml(finding.region || '—')}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Execution</div>
+        <div class="detail-value">${execInfo}</div>
+      </div>
+      <div class="detail-card">
+        <div class="detail-label">Created</div>
+        <div class="detail-value">${formatTime(finding.created_at)}</div>
+      </div>
+
+      ${finding.data && Object.keys(finding.data).length > 0 ? `
+      <div class="detail-card full-width">
+        <div class="detail-label">Additional Data</div>
+        <div class="json-display">${formatJson(finding.data)}</div>
+      </div>` : ''}
+    </div>
+  `;
+});
+
+// ── Connection Lost Banner ───────────────────────────────────────
+function showConnectionLost(label, reconnectFn) {
+  let banner = $('#connection-lost-banner');
+  if (banner) return; // already showing
+  banner = document.createElement('div');
+  banner.id = 'connection-lost-banner';
+  banner.className = 'connection-lost-banner';
+  banner.innerHTML = `&#9888; Connection lost (${escHtml(label)}) &mdash; real-time updates paused.`;
+  const btn = document.createElement('button');
+  btn.textContent = 'Reconnect';
+  btn.addEventListener('click', () => {
+    banner.remove();
+    reconnectFn();
+  });
+  banner.appendChild(btn);
+  document.body.appendChild(banner);
+}
+
+function hideConnectionLost() {
+  const banner = $('#connection-lost-banner');
+  if (banner) banner.remove();
+}
+
+// ── Agent Status (WebSocket) ─────────────────────────────────────
+const agentStatus = {
+  ws: null,
+  status: null,
+  _reconnectDelay: 1000,
+  _maxReconnectDelay: 30000,
+  _maxRetries: 50,
+  _retries: 0,
+  connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/api/agent-status`;
+    try {
+      this.ws = new WebSocket(url);
+      this.ws.onopen = () => {
+        this._reconnectDelay = 1000;
+        this._retries = 0;
+        hideConnectionLost();
+      };
+      this.ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          this.status = data;
+          this.updateBanner();
+          if (data.type === 'technique_complete') {
+            sse.showToast(
+              data.execution_id
+                ? `Done: ${data.technique}`
+                : `Dry-run complete: ${data.technique}`,
+              'execution',
+              data.execution_id ? `#/executions/${data.execution_id}` : undefined
+            );
+            if (currentView === '#/' || currentView === '#/executions') debouncedRefresh();
+          } else if (data.type === 'technique_failed') {
+            sse.showToast(`Failed: ${data.technique} — ${data.error}`, 'finding');
+          }
+        } catch (_) {}
+      };
+      this.ws.onclose = () => {
+        this._retries++;
+        if (this._retries >= this._maxRetries) {
+          showConnectionLost('WebSocket', () => {
+            this._retries = 0;
+            this._reconnectDelay = 1000;
+            this.connect();
+          });
+          return;
+        }
+        setTimeout(() => this.connect(), this._reconnectDelay);
+        this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
+      };
+    } catch (_) {}
+  },
+  updateBanner() {
+    let banner = $('#agent-status-banner');
+    if (!this.status || this.status.type !== 'technique_start') {
+      if (banner) banner.remove();
+      return;
+    }
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'agent-status-banner';
+      banner.className = 'agent-status-banner';
+      document.body.appendChild(banner);
+    }
+    banner.innerHTML = `<span class="loading-spinner" style="width:14px;height:14px;"></span> Agent running <strong>${escHtml(this.status.technique || 'technique')}</strong> (${this.status.dry_run ? 'dry-run' : 'execute'})...`;
+  }
+};
+
+// ── Real-Time Updates (SSE) ─────────────────────────────────────
+const sse = {
+  source: null,
+  _reconnectDelay: 1000,
+  _maxReconnectDelay: 30000,
+  _maxRetries: 50,
+  _retries: 0,
+  _maxToasts: 5,
+  connect() {
+    if (this.source) return;
+    this.source = new EventSource('/api/events');
+    this._reconnectDelay = 1000; // Reset on successful connect
+    this._retries = 0;
+    hideConnectionLost();
+
+    this.source.addEventListener('execution_update', (e) => {
+      const data = JSON.parse(e.data);
+      // Show a toast notification with link to latest execution
+      sse.showToast(
+        `New execution: ${data.latest?.technique || 'unknown'} (${data.latest?.status || '?'})`,
+        'execution',
+        data.latest?.id ? `#/executions/${data.latest.id}` : undefined
+      );
+      // Refresh current view if on dashboard or executions
+      if (currentView === '#/' || currentView === '#/executions') {
+        debouncedRefresh();
+      }
+    });
+
+    this.source.addEventListener('finding_update', (e) => {
+      const data = JSON.parse(e.data);
+      sse.showToast(
+        `${data.delta} new finding${data.delta !== 1 ? 's' : ''} detected`,
+        'finding'
+      );
+      // Refresh current view if on dashboard or findings
+      if (currentView === '#/' || currentView === '#/findings') {
+        debouncedRefresh();
+      }
+    });
+
+    this.source.onerror = () => {
+      // Reconnect with exponential backoff, capped at _maxRetries
+      this.source.close();
+      this.source = null;
+      this._retries++;
+      if (this._retries >= this._maxRetries) {
+        showConnectionLost('SSE', () => {
+          this._retries = 0;
+          this._reconnectDelay = 1000;
+          this.connect();
+        });
+        return;
+      }
+      setTimeout(() => this.connect(), this._reconnectDelay);
+      this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
+    };
+  },
+
+  showToast(message, type, link) {
+    let container = $('#toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;';
+      document.body.appendChild(container);
+    }
+
+    // Limit maximum number of visible toasts
+    const existing = container.children;
+    while (existing.length >= this._maxToasts) {
+      existing[0].remove();
+    }
+
+    const toast = document.createElement('div');
+    const color = type === 'finding' ? 'var(--sev-high)' : 'var(--cyan)';
+    toast.style.cssText = `background:var(--bg-elevated);border:1px solid ${color};color:var(--text-primary);padding:0.75rem 1rem;border-radius:6px;font-size:0.85rem;font-family:var(--font-mono);box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0;transform:translateX(20px);transition:all 0.3s ease;`;
+    if (link) {
+      toast.style.cursor = 'pointer';
+      toast.innerHTML = `${escHtml(message)} <span style="color:${color};text-decoration:underline;margin-left:6px;">View &rarr;</span>`;
+      toast.addEventListener('click', () => { location.hash = link; });
+    } else {
+      toast.textContent = message;
+    }
+    container.appendChild(toast);
+    // Animate in
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(0)';
+    });
+    // Auto-remove after 5s
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(20px)';
+      setTimeout(() => toast.remove(), 300);
+    }, 5000);
+  }
+};
+
+// ── Bootstrap ──────────────────────────────────────────────────
+window.addEventListener('hashchange', navigate);
+navigate();
+sse.connect();
+agentStatus.connect();
+</script>
+</body>
+</html>

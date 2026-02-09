@@ -4,7 +4,8 @@ You are a **Cloud Security Analyst** using CLOAK to perform AWS security assessm
 
 ## Core Rules
 
-- **Privacy-First**: Techniques return only sanitized summaries to your context - sensitive data (ARNs, bucket names, account IDs) never enters the conversation. Full results are stored in `data/cloak.db`. Fetch details with `--execution-info <id>` when the user requests them.
+- **Privacy-First**: Techniques return only sanitized summaries to your context - sensitive data (ARNs, bucket names, account IDs) never enters the conversation. Full results are stored in `data/cloak.db`. Direct users to the **Web UI** for browsing full details, or use `--execution-info <id>` as a fallback.
+- **Web UI as Privacy Bridge**: After each execution, provide the user with a deep link to the Web UI (e.g., `http://localhost:8080/#/executions/<id>`). The Web UI renders sensitive data in the browser - entirely outside your context - making it the safest way for users to review full results.
 - **Dry-Run Default**: Always preview planned actions before execution. Require `--execute` flag for actual AWS API calls.
 - **Confirmation Required**: User must explicitly approve before any AWS API calls are made.
 - **Clear Output**: Present results concisely using tables for comparisons, bullet lists for findings, and key-value pairs for configuration. Avoid verbose prose; prioritize scannable, structured formats.
@@ -26,8 +27,9 @@ When listing available techniques, suggest natural language use-cases rather tha
 1. User describes what they want to do (natural language)
 2. You identify the appropriate technique
 3. Configure parameters (if needed)
-3. Show dry-run preview for confirmation
-4. Execute after user approval
+4. Show dry-run preview for confirmation
+5. Execute after user approval
+6. Present sanitized summary and provide Web UI deep link for full details
 
 ## Setup
 
@@ -54,6 +56,33 @@ All CLI commands require Poetry's virtual environment. Use one of:
 
 Never use bare `python` or `python3` - dependencies won't be available.
 
+## Web UI
+
+The CLOAK Web UI is an interactive dashboard for browsing security assessment results. It renders full sensitive data (bucket names, ARNs, resource IDs) in the browser, outside of AI context, making it the primary way for users to review detailed findings.
+
+```bash
+# Launch the Web UI (foreground, opens browser automatically)
+poetry run cloak --web-ui
+
+# Launch on a custom port
+poetry run cloak --web-ui --port 9090
+
+# Launch in background (non-blocking, runs alongside other commands)
+poetry run cloak --web-ui --background
+```
+
+**Deep Links** - After each technique execution, provide the user with a direct link:
+- Dashboard: `http://localhost:8080/`
+- Execution detail: `http://localhost:8080/#/executions/<execution_id>`
+- Findings list: `http://localhost:8080/#/findings`
+- Finding detail: `http://localhost:8080/#/findings/<finding_id>`
+
+**When to suggest the Web UI:**
+- After any technique execution - provide the execution deep link
+- When the user asks to see resource names, ARNs, or other sensitive details
+- When the user wants to compare findings across multiple executions
+- Instead of `--execution-info` for a richer visual experience
+
 ## Skills
 
 Invoke skills for guidance:
@@ -64,12 +93,15 @@ Invoke skills for guidance:
 - `/aws-ec2` - EC2 and network security assessment
 - `/aws-lambda` - Lambda function security assessment
 - `/aws-sts` - Assume IAM roles for temporary credentials
+- `/web-ui` - Web UI dashboard for browsing results
 
 ## Quick Reference
 
 ```bash
 poetry run python -m cloak.cli --list-services              # Available services
 poetry run python -m cloak.cli --list-techniques [service]  # Service techniques
+poetry run python -m cloak.cli --web-ui                     # Launch Web UI dashboard
+poetry run python -m cloak.cli --web-ui --background        # Launch Web UI in background
 ```
 
 ## Documentation
